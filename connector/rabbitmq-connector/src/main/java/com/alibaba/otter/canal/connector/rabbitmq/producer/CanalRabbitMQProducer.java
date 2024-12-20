@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import com.alibaba.otter.canal.common.CanalException;
+import com.alibaba.otter.canal.common.utils.AddressUtils;
 import com.alibaba.otter.canal.common.utils.ExecutorTemplate;
 import com.alibaba.otter.canal.common.utils.PropertiesUtils;
 import com.alibaba.otter.canal.connector.core.producer.AbstractMQProducer;
@@ -61,7 +62,7 @@ public class CanalRabbitMQProducer extends AbstractMQProducer implements CanalMQ
                 throw new CanalException("failed to parse host", ex);
             }
         } else if (servers.contains(":")) {
-            String[] serverHostAndPort = servers.split(":");
+            String[] serverHostAndPort = AddressUtils.splitIPAndPort(servers);
             factory.setHost(serverHostAndPort[0]);
             factory.setPort(Integer.parseInt(serverHostAndPort[1]));
         } else {
@@ -81,13 +82,18 @@ public class CanalRabbitMQProducer extends AbstractMQProducer implements CanalMQ
         try {
             connect = factory.newConnection();
             channel = connect.createChannel();
-            channel.queueDeclare(rabbitMQProperties.getQueue(), true, false, false, null);
-            channel.exchangeDeclare(rabbitMQProperties
-                .getExchange(), rabbitMQProperties.getDeliveryMode(), true, false, false, null);
-            channel.queueBind(rabbitMQProperties.getQueue(),
-                rabbitMQProperties.getExchange(),
-                rabbitMQProperties.getRoutingKey());
-
+            String queue = rabbitMQProperties.getQueue();
+            String exchange = rabbitMQProperties.getExchange();
+            String deliveryMode = rabbitMQProperties.getDeliveryMode();
+            String routingKey = rabbitMQProperties.getRoutingKey();
+            if (!StringUtils.isEmpty(queue)) {
+                channel.queueDeclare(queue, true, false, false, null);
+            }
+            if (!StringUtils.isEmpty(queue) && !StringUtils.isEmpty(exchange) && !StringUtils.isEmpty(deliveryMode)
+                && !StringUtils.isEmpty(routingKey)) {
+                channel.exchangeDeclare(exchange, deliveryMode, true, false, false, null);
+                channel.queueBind(queue, exchange, routingKey);
+            }
         } catch (IOException | TimeoutException ex) {
             throw new CanalException("Start RabbitMQ producer error", ex);
         }
